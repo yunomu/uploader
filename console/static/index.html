@@ -1,0 +1,43 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>Loading...</title>
+    <meta charset="UTF-8">
+    <script src="/main.js"></script>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script>
+      fetch("./config.json")
+        .then(res => {
+                return res.json();
+              })
+        .then(cfg => {
+                const flags = {
+                                "idToken": localStorage.getItem('id_token'),
+                                "accessToken": localStorage.getItem('access_token'),
+                                "refreshToken": localStorage.getItem('refresh_token'),
+                                "windowWidth": window.innerWidth,
+                                "windowHeight": window.innerHeight,
+                                "authClientId": cfg.UserPoolClientId,
+                                "authRedirectURL": cfg.AuthRedirectURL,
+                                "logoutRedirectURL": cfg.LogoutRedirectURL,
+                                "idp": "https://"+cfg.IDP};
+                const app = Elm.Main.init({
+                        node: document.getElementById("app"),
+                        flags: flags
+                      });
+                app.ports.storeTokens.subscribe((req) => {
+                        localStorage.setItem('id_token', req[0]);
+                        localStorage.setItem('access_token', req[1]);
+                        localStorage.setItem('refresh_token', req[2]);
+                      });
+                app.ports.removeTokens.subscribe((req) => {
+                        localStorage.removeItem('id_token');
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('refresh_token');
+                      });
+              });
+    </script>
+  </body>
+</html>

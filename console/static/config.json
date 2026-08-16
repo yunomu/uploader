@@ -1,0 +1,6 @@
+{
+  "UserPoolClientId": "6klsvfvihmate3rsncud9tntpq",
+  "AuthRedirectURL": "https://blog.wagahai.info/callback",
+  "LogoutRedirectURL": "https://blog.wagahai.info/",
+  "IDP": "auth.wagahai.info"
+}
