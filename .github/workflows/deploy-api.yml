@@ -1,0 +1,73 @@
+name: Deploy API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**'
+      - '!README.md'
+      - '!.gitignore'
+      - '!cmd/**'
+      - '!ops/**'
+      - '!console/**'
+      - '!.github/**'
+      - '.github/workflows/deploy-api.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: deployment
+    env:
+      SAM_CLI_TELEMETRY: 0
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+
+      - name: Install protoc-gen-go
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+      - name: Install jq
+        run: sudo apt-get -y install jq
+
+      - name: Install protoc-gen-elm
+        run: go install github.com/yunomu/protoc-gen-elm@v1.2.0
+
+      - name: Setup SAM
+        uses: aws-actions/setup-sam@v3
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_API_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy
+        run: |
+          sam deploy --no-fail-on-empty-changeset \
+            --stack-name ${{ vars.STACK_NAME }} \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+            --tags StackName=${{ vars.STACK_NAME }} \
+            DomainName=${{ vars.SITE_DOMAIN_NAME }} \
+            Certificate=${{ secrets.CERTIFICATE }} \
+            UserPoolId=${{ vars.USER_POOL_ID }} \
+            CallbackURL=${{ vars.CALLBACK_URL }} \
+            LogoutURL=${{ vars.LOGOUT_URL }} \
+            FilePublicKeySSMName=${{ vars.FILE_PUBLIC_KEY_SSM_NAME }} \
+            FilePrivateKeySecretsArn=${{ secrets.FILE_PRIVATE_KEY_SECRETS_ARN }}
