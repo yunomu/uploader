@@ -31,6 +31,7 @@ type DynamoDBRecord struct {
 	Height      int    `dynamodbav:"H,omitempty"`
 	Status      string `dynamodbav:"Status,omitmpty"`
 	UserIdx     string `dynamodbav:"UserIdx,omitempty"`
+	Note        string `dynamodbav:"Note,omitempty"`
 }
 
 type DynamoDBLogger interface {
@@ -137,7 +138,7 @@ func (db *DynamoDB) Reserve(ctx context.Context, key, userId string) (int64, err
 	return ts, nil
 }
 
-func (db *DynamoDB) CreateCommit(ctx context.Context, key, contentType string, timestamp int64, size, width, height int) error {
+func (db *DynamoDB) CreateCommit(ctx context.Context, key, contentType string, timestamp int64, size, width, height int, note string) error {
 	expr, err := expression.NewBuilder().
 		WithKeyCondition(expression.Key("Key").Equal(expression.Value(key))).
 		WithCondition(expression.Equal(expression.Name("TS"), expression.Value(timestamp))).
@@ -146,7 +147,8 @@ func (db *DynamoDB) CreateCommit(ctx context.Context, key, contentType string, t
 				Set(expression.Name("Size"), expression.Value(size)).
 				Set(expression.Name("W"), expression.Value(width)).
 				Set(expression.Name("H"), expression.Value(height)).
-				Set(expression.Name("Status"), expression.Value(Status_AVAILABLE)),
+				Set(expression.Name("Status"), expression.Value(Status_AVAILABLE)).
+				Set(expression.Name("Note"), expression.Value(note)),
 		).
 		Build()
 	if err != nil {
@@ -287,6 +289,7 @@ func (db *DynamoDB) List(ctx context.Context, userId string, options ...ListOpti
 				Key:         r.Key,
 				UserId:      r.UserId,
 				ContentType: r.ContentType,
+				Note:        r.Note,
 				Entities: []*Entity{
 					{
 						Name:      r.Name,
@@ -368,6 +371,7 @@ func (db *DynamoDB) Get(ctx context.Context, key string) (*File, error) {
 		ret.Key = r.Key
 		ret.UserId = r.UserId
 		ret.ContentType = r.ContentType
+		ret.Note = r.Note
 		ret.Entities = append(ret.Entities, &Entity{
 			Name:      r.Name,
 			Timestamp: r.Timestamp,
@@ -483,7 +487,8 @@ func (db *DynamoDB) DeleteCommit(ctx context.Context, key string, ts int64) erro
 						Remove(expression.Name("Size")).
 						Remove(expression.Name("Width")).
 						Remove(expression.Name("Height")).
-						Remove(expression.Name("UserIdx")),
+						Remove(expression.Name("UserIdx")).
+						Remove(expression.Name("Note")),
 				).
 				Build()
 			if err != nil {

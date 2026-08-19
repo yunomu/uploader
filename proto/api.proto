@@ -7,6 +7,7 @@ option go_package = "proto/api";
 message UploadRequest {
   string content_type = 1;
   bytes blob = 2;
+  string note = 3;
 }
 
 message UploadResponse {
@@ -35,17 +36,19 @@ message GetUserResponse {
 }
 
 message File {
-  string path = 1;
+  string name = 1;
   int64 timestamp = 2;
   int32 size = 3;
   int32 width = 4;
   int32 height = 5;
+  string url = 6;
 }
 
 message GetFileResponse {
   string key = 1;
   string content_type = 2;
   repeated File files = 3;
+  string note = 4;
 }
 
 message DeleteFileRequest {

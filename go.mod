@@ -6,11 +6,13 @@ require (
 	github.com/aws/aws-lambda-go v1.54.0
 	github.com/aws/aws-sdk-go-v2 v1.43.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.37
+	github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.11.14
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.61
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.8.61
 	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.67.6
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.63.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.2
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.44.6
 	github.com/google/subcommands v1.2.0
 	golang.org/x/image v0.45.0
 	google.golang.org/protobuf v1.36.12

@@ -20,6 +20,7 @@ import (
 
 	apipb "github.com/yunomu/uploader/proto/api"
 
+	"github.com/yunomu/uploader/lib/cfsigner"
 	"github.com/yunomu/uploader/lib/filedb"
 	"github.com/yunomu/uploader/lib/randstr"
 	"github.com/yunomu/uploader/lib/storage"
@@ -48,10 +49,13 @@ func (l *defaultLogger) Error(err error, msg string)          {}
 func (l *defaultLogger) HandlerError(err error, req *Request) {}
 
 type Handler struct {
-	userdb  userdb.DB
-	filedb  filedb.DB
-	storage storage.Storage
-	rand    randstr.Generator
+	userdb     userdb.DB
+	filedb     filedb.DB
+	storage    storage.Storage
+	rand       randstr.Generator
+	cfsigner   *cfsigner.CFSigner
+	duration   time.Duration
+	filePrefix string
 
 	marshaler   protojson.MarshalOptions
 	unmarshaler protojson.UnmarshalOptions
@@ -76,13 +80,19 @@ func NewHandler(
 	filedb filedb.DB,
 	storage storage.Storage,
 	rand randstr.Generator,
+	cfsigner *cfsigner.CFSigner,
+	duration time.Duration,
+	filePrefix string,
 	options ...Option,
 ) *Handler {
 	h := &Handler{
-		userdb:  userdb,
-		filedb:  filedb,
-		storage: storage,
-		rand:    rand,
+		userdb:     userdb,
+		filedb:     filedb,
+		storage:    storage,
+		rand:       rand,
+		cfsigner:   cfsigner,
+		duration:   duration,
+		filePrefix: filePrefix,
 
 		marshaler: protojson.MarshalOptions{
 			EmitUnpopulated: true,
@@ -189,7 +199,7 @@ func (h *Handler) upload(ctx context.Context, req *Request) (proto.Message, erro
 		return nil, err
 	}
 
-	if err := h.filedb.CreateCommit(ctx, key, r.ContentType, ts, len(r.Blob), width, height); err != nil {
+	if err := h.filedb.CreateCommit(ctx, key, r.ContentType, ts, len(r.Blob), width, height, r.Note); err != nil {
 		return nil, err
 	}
 
@@ -263,13 +273,20 @@ func (h *Handler) get(ctx context.Context, req *Request) (proto.Message, error) 
 		Key:         file.Key,
 		ContentType: file.ContentType,
 	}
+	expires := time.Now().Add(h.duration)
 	for _, entity := range file.Entities {
+		url, err := h.cfsigner.Sign(fmt.Sprintf("%s/%s/%s", h.filePrefix, file.Key, entity.Name), expires)
+		if err != nil {
+			return nil, err
+		}
+
 		ret.Files = append(ret.Files, &apipb.File{
-			Path:      fmt.Sprintf("%s/%s", file.Key, entity.Name),
+			Name:      entity.Name,
 			Timestamp: entity.Timestamp,
 			Size:      int32(entity.Size),
 			Width:     int32(entity.Width),
 			Height:    int32(entity.Height),
+			Url:       url,
 		})
 	}
 
@@ -309,9 +326,10 @@ func (h *Handler) delete(ctx context.Context, req *Request) (proto.Message, erro
 
 func (h *Handler) Serve(ctx context.Context, req *Request) (*Response, error) {
 	handlers := map[string]func(context.Context, *Request) (proto.Message, error){
-		"POST /v1/file":         h.upload,
-		"GET /v1/file":          h.list,
-		"GET /v1/file/{key}":    h.get,
+		"POST /v1/file":      h.upload,
+		"GET /v1/file":       h.list,
+		"GET /v1/file/{key}": h.get,
+		//"PUT /v1/file/{key}":    h.update,
 		"DELETE /v1/file/{key}": h.delete,
 	}
 

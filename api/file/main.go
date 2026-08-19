@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"log/slog"
 	"math/rand"
 	"os"
@@ -9,10 +13,14 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
+	"github.com/yunomu/uploader/lib/cfsigner"
 	"github.com/yunomu/uploader/lib/filedb"
 	"github.com/yunomu/uploader/lib/randstr"
 	"github.com/yunomu/uploader/lib/storage"
@@ -71,6 +79,26 @@ func (h *handlerLogger) Error(err error, msg string) {
 	h.logger.Error(msg, "err", err)
 }
 
+func getSecretValue(ctx context.Context, cfg aws.Config, id string) (string, error) {
+	client := secretsmanager.NewFromConfig(cfg)
+
+	out, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{})
+	if err != nil {
+		return "", err
+	}
+
+	return aws.ToString(out.SecretString), nil
+}
+
+func parsePrivateKey(pemString string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemString))
+	if block == nil {
+		return nil, errors.New("Failed to perse PEM")
+	}
+
+	return x509.ParsePKCS1PrivateKey(block.Bytes)
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -79,6 +107,10 @@ func main() {
 	fileUserIndex := os.Getenv("FILE_USER_INDEX")
 	userTable := os.Getenv("USER_TABLE")
 	userNameIndex := os.Getenv("USER_NAME_INDEX")
+	filePrivateKeySecretName := os.Getenv("FILE_PRIVATE_KEY_SECRET_NAME")
+	keyPairId := os.Getenv("KEY_PAIR_ID")
+	domainName := os.Getenv("DOMAIN_NAME")
+	filePrefix := os.Getenv("FILE_PREFIX")
 	region := os.Getenv("REGION")
 
 	seed := time.Now().UnixNano()
@@ -90,6 +122,10 @@ func main() {
 		"region", region,
 		"debug", debug,
 		"seed", seed,
+		"domain", domainName,
+		"filePrefix", filePrefix,
+		"filePrivateKeySecretName", filePrivateKeySecretName,
+		"keyPairId", keyPairId,
 	)
 
 	cfg, err := config.LoadDefaultConfig(ctx, func(opt *config.LoadOptions) error {
@@ -98,6 +134,18 @@ func main() {
 	})
 	if err != nil {
 		slog.Error("LoadDefaultConfig", "err", err)
+		return
+	}
+
+	pkString, err := getSecretValue(ctx, cfg, filePrivateKeySecretName)
+	if err != nil {
+		slog.Error("getSecretValue", "err", err)
+		return
+	}
+
+	pk, err := parsePrivateKey(pkString)
+	if err != nil {
+		slog.Error("parsePrivateKey", "err", err)
 		return
 	}
 
@@ -130,6 +178,12 @@ func main() {
 			rand.New(rand.NewSource(seed)),
 			16,
 		),
+		cfsigner.New(
+			domainName,
+			sign.NewURLSigner(keyPairId, pk),
+		),
+		time.Hour,
+		filePrefix,
 		handler.SetLogger(&handlerLogger{
 			logger: logger.With("module", "handler"),
 		}),

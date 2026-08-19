@@ -25,6 +25,7 @@ type File struct {
 	Key         string
 	UserId      string
 	ContentType string
+	Note        string
 	Entities    []*Entity
 }
 
@@ -57,7 +58,7 @@ func SetContinuationToken(token string) ListOption {
 
 type DB interface {
 	Reserve(ctx context.Context, key, userId string) (int64, error)
-	CreateCommit(ctx context.Context, key, contentType string, timestamp int64, size, width, height int) error
+	CreateCommit(ctx context.Context, key, contentType string, timestamp int64, size, width, height int, note string) error
 	CreateReplica(ctx context.Context, key, name, userId, contentType string, size, width, height int) error
 	List(ctx context.Context, userId string, options ...ListOption) ([]*File, string, error)
 	Get(ctx context.Context, key string) (*File, error)

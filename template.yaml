@@ -23,7 +23,7 @@ Parameters:
   CloudFrontManagedCachePolicy:
     Type: String
     Default: "658327ea-f89d-4fab-a63d-7e88639e58f6"
-  EncodedFilePublicKey:
+  FilePublicKeySSMName:
     Type: String
   FilePrivateKeySecretsArn:
     Type: String
@@ -137,8 +137,8 @@ Resources:
               - s3:ListBucket
               - s3:GetObject
             Resource:
-              - !Sub "arn:aws:s3:::${ConsoleBucket}/*"
-              - !Sub "arn:aws:s3:::${ConsoleBucket}"
+              - !Sub "arn:aws:s3:::${FileBucket}/*"
+              - !Sub "arn:aws:s3:::${FileBucket}"
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${ConsoleDistribution}"
@@ -229,7 +229,7 @@ Resources:
       PublicKeyConfig:
         Name: !Sub "file-publickey-${AWS::StackName}"
         CallerReference: !Sub "${AWS::StackName}-pubkey"
-        EncodedKey: !Ref EncodedFilePublicKey
+        EncodedKey: !Sub "{{resolve:ssm:${FilePublicKeySSMName}}}"
 
   FileKeyGroup:
     Type: AWS::CloudFront::KeyGroup
@@ -357,9 +357,13 @@ Resources:
           REGION: !Ref AWS::Region
           USER_TABLE: !Ref UserTable
           USER_NAME_INDEX: !Ref UserNameIndex
-          File_TABLE: !Ref FileTable
-          File_USER_INDEX: !Ref FileUserIndex
+          FILE_TABLE: !Ref FileTable
+          FILE_USER_INDEX: !Ref FileUserIndex
           FILE_BUCKET: !Ref FileBucket
+          FILE_PRIVATE_KEY_SECRET_NAME: !Ref FilePrivateKeySecretsArn
+          KEY_PAIR_ID: !Ref FilePublicKey
+          DOMAIN_NAME: !Ref DomainName
+          FILE_PREFIX: /files
       Events:
         Upload:
           Type: HttpApi
