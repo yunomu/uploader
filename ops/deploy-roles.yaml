@@ -17,6 +17,10 @@ Parameters:
   SamManagedStackName:
     Type: String
     Default: aws-sam-cli-managed-default
+  SSMParamArns:
+    Type: CommaDelimitedList
+  UserPoolId:
+    Type: String
 
 Resources:
   DeployApiRole:
@@ -133,6 +137,27 @@ Resources:
                   - iam:ListPolicyVersions
                 Resource:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:policy/${StackName}-*"
+              - Sid: Cognito
+                Effect: Allow
+                Action:
+                  - cognito-idp:DescribeUserPoolClient
+                  - cognito-idp:UpdateUserPoolClient
+                Resource:
+                  - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}"
+              - Sid: ApiGatewayV2
+                Effect: Allow
+                Action:
+                  - apigateway:POST
+                  - apigateway:GET
+                  - apigateway:PUT
+                  - apigateway:PATCH
+                  - apigateway:DELETE
+                  - apigateway:TagResource
+                  - apigateway:UntagResource
+                Resource:
+                  - !Sub "arn:aws:apigateway:${AWS::Region}::/apis"
+                  - !Sub "arn:aws:apigateway:${AWS::Region}::/apis/*"
+                  - !Sub "arn:aws:apigateway:${AWS::Region}::/tags/*"
               - Sid: LambdaManage
                 Effect: Allow
                 Action:
@@ -142,14 +167,24 @@ Resources:
                   - lambda:DeleteFunction
                   - lambda:AddPermission
                   - lambda:RemovePermission
-                  - lambda:TagResource
-                  - lambda:UntagResource
                   - lambda:CreateFunctionUrlConfig
                   - lambda:UpdateFunctionUrlConfig
                   - lambda:DeleteFunctionUrlConfig
                   - lambda:GetFunctionUrlConfig
                 Resource:
                   - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${StackName}-*"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:event-source-mapping:*"
+              - Sid: LambdaEventSourceMapping
+                Effect: Allow
+                Action:
+                  - lambda:CreateEventSourceMapping
+                  - lambda:UpdateEventSourceMapping
+                  - lambda:DeleteEventSourceMapping
+                  - lambda:GetEventSourceMapping
+                  - lambda:ListEventSourceMapping
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                Resource: "*"
               - Sid: DynamoDBManage
                 Effect: Allow
                 Action:
@@ -199,6 +234,20 @@ Resources:
                   - cloudfront:TagResource
                   - cloudfront:UntagResource
                   - cloudfront:ListTagsForResource
+                  - cloudfront:CreateCachePolicy
+                  - cloudfront:UpdateCachePolicy
+                  - cloudfront:DeleteCachePolicy
+                  - cloudfront:GetCachePolicy
+                  - cloudfront:GetCachePolicyConfig
+                  - cloudfront:CreateKeyGroup
+                  - cloudfront:UpdateKeyGroup
+                  - cloudfront:DeleteKeyGroup
+                  - cloudfront:GetKeyGroup
+                  - cloudfront:CreatePublicKey
+                  - cloudfront:UpdatePublicKey
+                  - cloudfront:DeletePublicKey
+                  - cloudfront:GetPublicKey
+                  - cloudfront:GetPublicKeyConfig
                 Resource: "*"
               - Sid: CloudFrontOAC
                 Effect: Allow
@@ -234,8 +283,7 @@ Resources:
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParameters
-                Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stack/env/CertificateUsEast1"
+                Resource: !Ref SSMParamArns
 
   DeployConsoleRole:
     Type: AWS::IAM::Role
