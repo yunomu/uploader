@@ -62,8 +62,8 @@ jobs:
             --stack-name ${{ vars.STACK_NAME }} \
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
-            --parameter-overrides \
             --tags StackName=${{ vars.STACK_NAME }} \
+            --parameter-overrides \
             DomainName=${{ vars.SITE_DOMAIN_NAME }} \
             Certificate=${{ secrets.CERTIFICATE }} \
             UserPoolId=${{ vars.USER_POOL_ID }} \
